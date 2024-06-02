@@ -8833,17 +8833,71 @@ def setup_proxy():
     socket.socket = socks.socksocket  # type: ignore
 
 
+def extract_date(raw_data:dict, date_requested:str) ->str:
+    date = raw_data.get(date_requested)
+    if date:
+        if type(date) is list:
+            return date[0].strftime('%d-%m-%Y')
+        else:
+            return date.strftime('%d-%m-%Y')
+    return ""
+    
+    
+def arange_raw_to_context(raw_data):
+    result = {
+        'Admin': {
+            'Country' : raw_data.get("country", ""),
+            'Name' : raw_data.get("org", ""),
+            'State' : raw_data.get("state", "")
+        },
+        "CreationDate": extract_date(raw_data, "creation_date"),
+        "ExpirationDate": extract_date(raw_data, "expiration_date"),
+        "UpdatedDate": extract_date(raw_data, "updated_date"),
+        "DomainStatus": raw_data.get("status", []),
+        "FeedRelatedIndicators": [{"Email": email} for email in raw_data.get("emails", [])],
+        "Name": raw_data.get("domain_name",)[0] if raw_data.get("domain_name") else "",
+        "NameServers": raw_data.get("name_servers", []),
+        "Organization": raw_data.get("org", ""),
+        "Registrant": {
+            'Country' : raw_data.get("country", ""),
+            'Organization' : raw_data.get("org", ""),
+            'State' : raw_data.get("state", "")
+        },
+        "Registrar": raw_data.get("registrar", ""),
+        "status": raw_data.get("status",[])
+    }
+    
+
+def new_domain_comand() ->list[CommandResults]:
+    import whois
+    args = demisto.args()
+    domains = argToList(args.get("domain", []))
+    results = []
+    for domain in domains:
+        domain_data = whois.whois(domain)
+        context_output = arange_raw_to_context(domain_data)
+        
+        
 ''' EXECUTION CODE '''
 
 
 def main():  # pragma: no cover
     demisto.debug(f"command is {demisto.command()}")
     command = demisto.command()
+    params = demisto.params()
     should_error = argToBoolean(demisto.params().get('with_error', False))
 
     reliability = demisto.params().get('integrationReliability')
     reliability = reliability if reliability else DBotScoreReliability.B
 
+    if params.get('new-version'):
+        results: List[CommandResults] = []
+        try:
+            if command == 'domain':
+                results = new_domain_comand()
+        except Exception as e:
+            raise
+    
     org_socket = None
     if DBotScoreReliability.is_valid_type(reliability):
         reliability = DBotScoreReliability.get_dbot_score_reliability_from_str(reliability)

@@ -28,7 +28,7 @@ configuration:
   advanced: true
   required: false
   hidden: false
-- display: Use updated  version
+- display: Use updated version
   name: new-version
   type: 8
   section: Collect
