@@ -8855,27 +8855,41 @@ def arange_raw_to_context(raw_data):
         "UpdatedDate": extract_date(raw_data, "updated_date"),
         "DomainStatus": raw_data.get("status", []),
         "FeedRelatedIndicators": [{"Email": email} for email in raw_data.get("emails", [])],
-        "Name": raw_data.get("domain_name",)[0] if raw_data.get("domain_name") else "",
+        "Name": raw_data.get("domain_name") if raw_data.get("domain_name") else "",
         "NameServers": raw_data.get("name_servers", []),
         "Organization": raw_data.get("org", ""),
-        "Registrant": {
-            'Country' : raw_data.get("country", ""),
-            'Organization' : raw_data.get("org", ""),
-            'State' : raw_data.get("state", "")
-        },
-        "Registrar": raw_data.get("registrar", ""),
-        "status": raw_data.get("status",[])
+        "Registrant": get_info_by_prefix(raw_data, 'registrant'),
+        "Registrar": get_info_by_prefix(raw_data, 'registrar'),
+        "Tech": get_info_by_prefix(raw_data, 'tech'),
+        "status": raw_data.get("status",[]),
+        "WHOIS": raw_data
     }
+    return result
     
+
+def get_info_by_prefix(domain_data, prefix):
+    if prefix == "registrar":
+        return {"registrar_name" if key == "registrar" else key: value for key, value in domain_data.items() if key.startswith(prefix)}
+    return {key: value for key, value in domain_data.items() if key.startswith(prefix)}
+
 
 def new_domain_comand() ->list[CommandResults]:
     import whois
     args = demisto.args()
     domains = argToList(args.get("domain", []))
+    domain = argToList(args.get('query'))
     results = []
-    for domain in domains:
-        domain_data = whois.whois(domain)
+    for domai in domain:
+        domain_data = whois.whois(domai)
         context_output = arange_raw_to_context(domain_data)
+        results.append(CommandResults(
+                outputs={Common.Domain.CONTEXT_PATH: context_output},
+                entry_type=EntryType.NOTE,
+                content_format=EntryFormat.MARKDOWN,
+                readable_output=tableToMarkdown('Whois NEW results for {}'.format(domai), context_output),
+                raw_response=str(domain_data)
+            ))
+    return(results)
         
         
 ''' EXECUTION CODE '''
@@ -8890,11 +8904,12 @@ def main():  # pragma: no cover
     reliability = demisto.params().get('integrationReliability')
     reliability = reliability if reliability else DBotScoreReliability.B
 
-    if params.get('new-version'):
+    old_version = argToBoolean(params.get('old-version'))
+    if old_version == False:
         results: List[CommandResults] = []
         try:
-            if command == 'domain':
-                results = new_domain_comand()
+            if command in ('domain', 'whois'):
+                return_results(new_domain_comand())
         except Exception as e:
             raise
     

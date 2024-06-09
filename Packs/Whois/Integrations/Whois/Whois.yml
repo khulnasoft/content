@@ -28,8 +28,8 @@ configuration:
   advanced: true
   required: false
   hidden: false
-- display: Use updated version
-  name: new-version
+- display: Use old version
+  name: old-version
   type: 8
   section: Collect
   advanced: true
