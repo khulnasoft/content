@@ -8669,7 +8669,8 @@ def whois_command(reliability: str) -> List[CommandResults]:
                 whois_result['query'] = query
                 json_res = json.dumps(whois_result, indent=4, sort_keys=True, default=str)
                 context_res.update({'Whois(val.query==obj.query)': json.loads(json_res)})
-
+            demisto.debug(f"{md=}")
+            demisto.debug(f"{context_res=}")
             result = CommandResults(
                 outputs=context_res,
                 entry_type=EntryType.NOTE,
@@ -8836,35 +8837,45 @@ def setup_proxy():
 def extract_date(raw_data:dict, date_requested:str) ->str:
     date = raw_data.get(date_requested)
     if date:
-        if type(date) is list:
-            return date[0].strftime('%d-%m-%Y')
-        else:
-            return date.strftime('%d-%m-%Y')
+        try:
+            if type(date) is list:
+                return str(date[0].strftime('%d-%m-%Y'))
+            else:
+                return str(date.strftime('%d-%m-%Y'))
+        except AttributeError as e:
+            demisto.debug(f"Couldn't extract date {date=}")
+            date_part = date.split()[-1]
+            return str(date_part)
     return ""
     
     
-def arange_raw_to_context(raw_data):
-    result = {
-        'Admin': {
-            'Country' : raw_data.get("country", ""),
-            'Name' : raw_data.get("org", ""),
-            'State' : raw_data.get("state", "")
-        },
+def arange_raw_to_context(raw_data, domain):
+    context_data = {
+        "Name": domain,
+        "Whois_server": raw_data.get("whois_server"),
         "CreationDate": extract_date(raw_data, "creation_date"),
         "ExpirationDate": extract_date(raw_data, "expiration_date"),
         "UpdatedDate": extract_date(raw_data, "updated_date"),
-        "DomainStatus": raw_data.get("status", []),
-        "FeedRelatedIndicators": [{"Email": email} for email in raw_data.get("emails", [])],
-        "Name": raw_data.get("domain_name") if raw_data.get("domain_name") else "",
-        "NameServers": raw_data.get("name_servers", []),
-        "Organization": raw_data.get("org", ""),
+        "Organization": raw_data.get("org"),
+        "Referral url": raw_data.get("referral_url",""),
+        "Orgenization": raw_data.get("org"),
+        "Address": raw_data.get("address"),
+        "City": raw_data.get("city"),
+        "State": raw_data.get("state"),
+        "Country": raw_data.get("country"),
+        "Dnssec": raw_data.get('dnssec'),
         "Registrant": get_info_by_prefix(raw_data, 'registrant'),
         "Registrar": get_info_by_prefix(raw_data, 'registrar'),
         "Tech": get_info_by_prefix(raw_data, 'tech'),
-        "status": raw_data.get("status",[]),
-        "WHOIS": raw_data
+        "Domain status": raw_data.get("status",[]),
+        "Phone": raw_data.get('phone',[]),
+        "Emails": raw_data.get("emails"),
+        "NameServers": list(set(map(str.lower, raw_data.get("name_servers", [])))),
+        "DomainStatus": raw_data.get("status", []),
+        "FeedRelatedIndicators": [{"Email": email} for email in list(raw_data.get("emails"))]if isinstance( raw_data.get("emails"), list) else raw_data.get("emails"),
     }
-    return result
+    remove_nulls_from_dictionary(context_data)
+    return context_data
     
 
 def get_info_by_prefix(domain_data, prefix):
@@ -8876,18 +8887,16 @@ def get_info_by_prefix(domain_data, prefix):
 def new_domain_comand() ->list[CommandResults]:
     import whois
     args = demisto.args()
-    domains = argToList(args.get("domain", []))
-    domain = argToList(args.get('query'))
+    domains = argToList(args.get('query') or args.get("domain"))
     results = []
-    for domai in domain:
-        domain_data = whois.whois(domai)
-        context_output = arange_raw_to_context(domain_data)
+    for domain in domains:
+        domain_data = whois.whois(domain)
+        demisto.debug(f"whois lib return raw_data for {domain} domain: {domain_data=} ")
+        context_output = arange_raw_to_context(domain_data, domain)
         results.append(CommandResults(
                 outputs={Common.Domain.CONTEXT_PATH: context_output},
-                entry_type=EntryType.NOTE,
-                content_format=EntryFormat.MARKDOWN,
-                readable_output=tableToMarkdown('Whois NEW results for {}'.format(domai), context_output),
-                raw_response=str(domain_data)
+                readable_output=tableToMarkdown('Whois NEW results for {}'.format(domain), context_output, headers=["Name","Admin","CreationDate","ExpirationDate","UpdatedDate","NameServers","Organization","Registrar","Domain status","Emails"], removeNull=True),
+                raw_response=context_output
             ))
     return(results)
         
@@ -8908,46 +8917,50 @@ def main():  # pragma: no cover
     if old_version == False:
         results: List[CommandResults] = []
         try:
-            if command in ('domain', 'whois'):
+            if command == 'domain':
+                return_results(new_domain_comand())
+            elif command == 'whois':
                 return_results(new_domain_comand())
         except Exception as e:
-            raise
-    
-    org_socket = None
-    if DBotScoreReliability.is_valid_type(reliability):
-        reliability = DBotScoreReliability.get_dbot_score_reliability_from_str(reliability)
+            demisto.error(f"{e=}")
+            return_error(e)
+            
     else:
-        raise Exception("Please provide a valid value for the Source Reliability parameter.")
-    try:
-        results: List[CommandResults] = []
-        if command == 'ip':
-            results = ip_command(reliability=reliability, should_error=should_error)
-
+        org_socket = None
+        if DBotScoreReliability.is_valid_type(reliability):
+            reliability = DBotScoreReliability.get_dbot_score_reliability_from_str(reliability)
         else:
-            org_socket = socket.socket
-            setup_proxy()
-            if command == 'test-module':
-                results = test_command()
-
-            elif command == 'whois':
-                results = whois_command(reliability=reliability)
-
-            elif command == "domain":
-                results = domain_command(reliability=reliability)
+            raise Exception("Please provide a valid value for the Source Reliability parameter.")
+        try:
+            results: List[CommandResults] = []
+            if command == 'ip':
+                results = ip_command(reliability=reliability, should_error=should_error)
 
             else:
-                raise NotImplementedError()
+                org_socket = socket.socket
+                setup_proxy()
+                if command == 'test-module':
+                    results = test_command()
 
-        demisto.debug(f"Returning results for command {demisto.command()}")
-        return_results(results)
-    except Exception as e:
-        msg = f"Exception thrown calling command '{demisto.command()}' {e.__class__.__name__}: {e}"
-        demisto.error(msg)
-        return_error(message=msg, error=e)
-    finally:
-        if command != 'ip':
-            socks.set_default_proxy()  # clear proxy settings
-            socket.socket = org_socket  # type: ignore
+                elif command == 'whois':
+                    results = whois_command(reliability=reliability)
+
+                elif command == "domain":
+                    results = domain_command(reliability=reliability)
+
+                else:
+                    raise NotImplementedError()
+
+            demisto.debug(f"Returning results for command {demisto.command()}")
+            return_results(results)
+        except Exception as e:
+            msg = f"Exception thrown calling command '{demisto.command()}' {e.__class__.__name__}: {e}"
+            demisto.error(msg)
+            return_error(message=msg, error=e)
+        finally:
+            if command != 'ip':
+                socks.set_default_proxy()  # clear proxy settings
+                socket.socket = org_socket  # type: ignore
 
 
 # python2 uses __builtin__ python3 uses builtins
