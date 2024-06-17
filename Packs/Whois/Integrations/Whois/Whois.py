@@ -8844,9 +8844,17 @@ def extract_date(raw_data:dict, date_requested:str) ->str:
                 return str(date.strftime('%d-%m-%Y'))
         except AttributeError as e:
             demisto.debug(f"Couldn't extract date {date=}")
+            parsed_date = dateparser.parse(date)
             date_part = date.split()[-1]
             return str(date_part)
     return ""
+
+def name_servers(servers):
+    if isinstance(servers, str):
+        if '\n' in servers:
+            return servers.split('\n')
+        return servers
+    return list(set(map(str.lower, servers)))
     
     
 def arange_raw_to_context(raw_data, domain):
@@ -8870,7 +8878,7 @@ def arange_raw_to_context(raw_data, domain):
         "Domain status": raw_data.get("status",[]),
         "Phone": raw_data.get('phone',[]),
         "Emails": raw_data.get("emails"),
-        "NameServers": list(set(map(str.lower, raw_data.get("name_servers", [])))),
+        "NameServers": name_servers(raw_data.get("name_servers", [])),
         "DomainStatus": raw_data.get("status", []),
         "FeedRelatedIndicators": [{"Email": email} for email in list(raw_data.get("emails"))]if isinstance( raw_data.get("emails"), list) else raw_data.get("emails"),
     }
