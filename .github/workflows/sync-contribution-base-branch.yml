@@ -10,7 +10,7 @@ permissions:
 jobs:
   sync_contributor_base_branch:
     runs-on: ubuntu-latest
-    if: github.repository == 'demisto/content'
+    if: github.repository == 'khulnasoft/content'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,7 +25,7 @@ jobs:
           poetry install --with github-actions
       - name: Sync Base Branch to Master
         env:
-          CONTENTBOT_GH_ADMIN_TOKEN: ${{ secrets.CONTENTBOT_GH_ADMIN_TOKEN }}
+          ORG_REPO_TOKEN: ${{ secrets.ORG_REPO_TOKEN }}
         run: |
           echo "Updating contribution base branches (contrib/*)"
           cd .github/github_workflow_scripts

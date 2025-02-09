@@ -7,7 +7,7 @@ env:
 jobs:
   release_notes_review:
     runs-on: ubuntu-latest
-    if: github.repository == 'demisto/content'
+    if: github.repository == 'khulnasoft/content'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
