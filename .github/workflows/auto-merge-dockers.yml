@@ -11,7 +11,7 @@ permissions:
 jobs:
   auto_approve_and_merge:
     runs-on: ubuntu-latest
-    if: startsWith(github.head_ref, 'demisto/') && github.repository == 'demisto/content' && contains(github.event.pull_request.labels.*.name, 'docker-image-auto-update')
+    if: startsWith(github.head_ref, 'demisto/') && github.repository == 'khulnasoft/content' && contains(github.event.pull_request.labels.*.name, 'docker-image-auto-update')
     steps:
       - name: Print out context
         run: |
@@ -41,4 +41,4 @@ jobs:
           slack-message: "GitHub build result: ${{ job.status }}\n${{ github.event.pull_request.html_url || github.event.head_commit.url }}"
         env:
           SLACK_BOT_TOKEN: ${{ secrets.CORTEX_XSOAR_SLACK_TOKEN }}
-          CONTENTBOT_GH_ADMIN_TOKEN: ${{ secrets.CONTENTBOT_GH_ADMIN_TOKEN }}
+          ORG_REPO_TOKEN: ${{ secrets.ORG_REPO_TOKEN }}
