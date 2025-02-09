@@ -9,7 +9,7 @@ permissions:
 jobs:
   handle_new_external_pr:
     runs-on: ubuntu-latest
-    if: github.repository == 'demisto/content' && github.event.action == 'opened' && github.event.pull_request.head.repo.fork == true && contains(github.head_ref, 'xsoar-bot-contrib-ContributionTestPack') == false
+    if: github.repository == 'khulnasoft/content' && github.event.action == 'opened' && github.event.pull_request.head.repo.fork == true && contains(github.head_ref, 'xsoar-bot-contrib-ContributionTestPack') == false
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,7 +36,7 @@ jobs:
           echo "PYTHONPATH=$GITHUB_WORKSPACE" >> $GITHUB_ENV
       - name: Update External PR
         env:
-          CONTENTBOT_GH_ADMIN_TOKEN: ${{ secrets.CONTENTBOT_GH_ADMIN_TOKEN }}
+          ORG_REPO_TOKEN: ${{ secrets.ORG_REPO_TOKEN }}
           EVENT_PAYLOAD: ${{ toJson(github.event) }}
         run: |
           echo "Updating External PR ${{ github.event.pull_request.html_url }}"
@@ -48,7 +48,7 @@ jobs:
         if: contains(github.event.pull_request.title, '[Marketplace Contribution]')
         run: gh pr edit "$PR_NUMBER" --add-label "$LABEL"
         env:
-          GH_TOKEN: ${{ secrets.CONTENTBOT_GH_ADMIN_TOKEN }}
+          GH_TOKEN: ${{ secrets.ORG_REPO_TOKEN }}
           GH_REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           LABEL: "Contribution Form Filled"
@@ -56,7 +56,7 @@ jobs:
       - name: Send Notification
         if: startsWith(github.event.pull_request.title, 'test') != true
         env:
-          CONTENTBOT_GH_ADMIN_TOKEN: ${{ secrets.CONTENTBOT_GH_ADMIN_TOKEN }}
+          ORG_REPO_TOKEN: ${{ secrets.ORG_REPO_TOKEN }}
           EVENT_PAYLOAD: ${{ toJson(github.event) }}
           CORTEX_XSOAR_SLACK_TOKEN: ${{ secrets.CORTEX_XSOAR_SLACK_TOKEN }}
         run: |
